@@ -1,12 +1,14 @@
-```markdown
 # Proyecto Hadoop: Instalación, Configuración y Prácticas
 
 Este repositorio contiene la guía de despliegue y los ejercicios prácticos desarrollados sobre el ecosistema de Apache Hadoop.
 
-**Entorno:** Ubuntu Server  
-**Dirección IP del Servidor:** 192.168.1.206  
-**Versión de Hadoop:** 3.4.0 (Single Node)  
-**Versión de Java:** 17  
+**Entorno:** Ubuntu Server
+
+**Dirección IP del Servidor:** 192.168.1.206
+
+**Versión de Hadoop:** 3.4.0 (Single Node)
+
+**Versión de Java:** 17
 
 ---
 

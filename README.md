@@ -32,7 +32,7 @@ chmod 0600 ~/.ssh/authorized_keys
 Para registrar la huella de seguridad, realizamos una primera conexión manual (escribir "yes" cuando lo solicite y luego cerrar la sesión con "exit"):
 
 ```bash
-ssh [IP DEL SERVIDOR]
+ssh 192.168.1.206
 ```
 
 ## 3. Descarga y Ubicación de Hadoop 3.4.0
@@ -40,7 +40,7 @@ ssh [IP DEL SERVIDOR]
 Descargamos los binarios oficiales, los descomprimimos y los movemos a una ruta estándar para administración de software.
 
 ```bash
-wget [https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz](https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz)
+wget https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz
 tar -xzvf hadoop-3.4.0.tar.gz
 sudo mv hadoop-3.4.0 /usr/local/hadoop
 sudo chown -R $USER:$USER /usr/local/hadoop
@@ -48,7 +48,7 @@ sudo chown -R $USER:$USER /usr/local/hadoop
 
 ## 4. Configuración de Variables de Entorno del Usuario
 
-Agregamos las rutas de ejecución de Java y Hadoop al perfil del servidor para tener acceso global a los comandos. 
+Agregamos las rutas de ejecución de Java y Hadoop al perfil del servidor para tener acceso global a los comandos.  
 Abrimos el archivo de configuración de sesión:
 
 ```bash
@@ -90,12 +90,12 @@ echo "export PDSH_RCMD_TYPE=ssh" >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
 
 ### core-site.xml (Sistema de Archivos Central)
 
-```xml
+```bash
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/core-site.xml
 <configuration>
     <property>
         <name>fs.defaultFS</name>
-        <value>hdfs://[IP DEL SERVIDOR]:9000</value>
+        <value>hdfs://192.168.1.206:9000</value>
     </property>
 </configuration>
 EOF
@@ -104,7 +104,7 @@ EOF
 ### hdfs-site.xml (Almacenamiento y Directorios)
 Se define la replicación en "1" (al ser un solo nodo) y se establecen las rutas físicas donde se guardarán los datos de los bloques.
 
-```xml
+```bash
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/hdfs-site.xml
 <configuration>
     <property>
@@ -125,7 +125,7 @@ EOF
 
 ### mapred-site.xml (Motor de MapReduce)
 
-```xml
+```bash
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/mapred-site.xml
 <configuration>
     <property>
@@ -151,7 +151,7 @@ EOF
 ### yarn-site.xml (Gestor de Recursos YARN)
 Obligamos explícitamente al ResourceManager a publicarse en la IP del servidor.
 
-```xml
+```bash
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/yarn-site.xml
 <configuration>
     <property>
@@ -164,7 +164,7 @@ cat << 'EOF' > /usr/local/hadoop/etc/hadoop/yarn-site.xml
     </property>
     <property>
         <name>yarn.resourcemanager.hostname</name>
-        <value>[IP DEL SERVIDOR]</value>
+        <value>192.168.1.206</value>
     </property>
 </configuration>
 EOF
@@ -174,7 +174,7 @@ EOF
 Reemplazamos cualquier rastro de localhost para que el gestor localice los datanodes en la IP real.
 
 ```bash
-echo "[IP DEL SERVIDOR]" > /usr/local/hadoop/etc/hadoop/workers
+echo "192.168.1.206" > /usr/local/hadoop/etc/hadoop/workers
 ```
 
 ## 6. Parche de Compatibilidad: Java 17 y ResourceManager (YARN)
@@ -230,6 +230,6 @@ jps
 * Jps
 
 Finalmente, las interfaces de monitoreo web estarán disponibles en el navegador:
-* **Administración HDFS:** `http://[IP DEL SERVIDOR]:9870`
-* **Administración YARN:** `http://[IP DEL SERVIDOR]:8088`
+* **Administración HDFS:** `http://192.168.1.206:9870`
+* **Administración YARN:** `http://192.168.1.206:8088`
 ```

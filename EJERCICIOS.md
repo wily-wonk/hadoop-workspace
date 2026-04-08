@@ -8,6 +8,8 @@ Este documento contiene una serie de ejercicios progresivos para dominar el uso 
 ## Ejercicios Hadoop Nivel 1: Dominando HDFS
 
 ### Ejercicio 1: Comandos básicos de HDFS
+```
+
 ```bash
 # 1. Ver directorio raíz
 hdfs dfs -ls /

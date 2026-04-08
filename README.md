@@ -1,3 +1,4 @@
+```markdown
 # Proyecto Hadoop: Instalación, Configuración y Prácticas
 
 Este repositorio contiene la guía de despliegue y los ejercicios prácticos desarrollados sobre el ecosistema de Apache Hadoop.
@@ -13,38 +14,50 @@ Este repositorio contiene la guía de despliegue y los ejercicios prácticos des
 
 Actualizamos los repositorios e instalamos la versión estable de Java 17, junto con herramientas de red esenciales como SSH y PDSH.
 
-bash
+```bash
 sudo apt update
 sudo apt install openjdk-17-jdk ssh pdsh wget tar -y
+```
 
-2. Configuración de Seguridad SSH (Acceso Automático)
-Hadoop requiere conectarse a sus propios procesos a través de la red. Generamos las llaves RSA y las autorizamos apuntando estrictamente a la IP del servidor, eliminando dependencias de localhost.
+## 2. Configuración de Seguridad SSH (Acceso Automático)
 
-Bash
+Hadoop requiere conectarse a sus propios procesos a través de la red. Generamos las llaves RSA y las autorizamos apuntando estrictamente a la IP del servidor, eliminando dependencias de `localhost`.
+
+```bash
 ssh-keygen -t rsa -P '' -f ~/.ssh/id_rsa
 cat ~/.ssh/id_rsa.pub >> ~/.ssh/authorized_keys
 chmod 0600 ~/.ssh/authorized_keys
+```
+
 Para registrar la huella de seguridad, realizamos una primera conexión manual (escribir "yes" cuando lo solicite y luego cerrar la sesión con "exit"):
 
-Bash
+```bash
 ssh [IP DEL SERVIDOR]
-3. Descarga y Ubicación de Hadoop 3.4.0
+```
+
+## 3. Descarga y Ubicación de Hadoop 3.4.0
+
 Descargamos los binarios oficiales, los descomprimimos y los movemos a una ruta estándar para administración de software.
 
-Bash
+```bash
 wget [https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz](https://dlcdn.apache.org/hadoop/common/hadoop-3.4.0/hadoop-3.4.0.tar.gz)
 tar -xzvf hadoop-3.4.0.tar.gz
 sudo mv hadoop-3.4.0 /usr/local/hadoop
 sudo chown -R $USER:$USER /usr/local/hadoop
-4. Configuración de Variables de Entorno del Usuario
-Agregamos las rutas de ejecución de Java y Hadoop al perfil del servidor para tener acceso global a los comandos.
+```
+
+## 4. Configuración de Variables de Entorno del Usuario
+
+Agregamos las rutas de ejecución de Java y Hadoop al perfil del servidor para tener acceso global a los comandos. 
 Abrimos el archivo de configuración de sesión:
 
-Bash
+```bash
 nano ~/.bashrc
+```
+
 Añadimos el siguiente bloque al final del archivo:
 
-Bash
+```bash
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export HADOOP_HOME=/usr/local/hadoop
 export HADOOP_INSTALL=$HADOOP_HOME
@@ -55,21 +68,29 @@ export YARN_HOME=$HADOOP_HOME
 export HADOOP_COMMON_LIB_NATIVE_DIR=$HADOOP_HOME/lib/native
 export PATH=$PATH:$HADOOP_HOME/sbin:$HADOOP_HOME/bin
 export HADOOP_OPTS="-Djava.library.path=$HADOOP_HOME/lib/native"
+```
+
 Recargamos la configuración en la sesión actual:
 
-Bash
+```bash
 source ~/.bashrc
-5. Configuración del Ecosistema Hadoop
+```
+
+## 5. Configuración del Ecosistema Hadoop
+
 Configuramos los archivos "core" inyectando el código directamente para garantizar la integridad de la estructura XML y apuntar todo el tráfico a la IP de red.
 
-hadoop-env.sh (Entorno Interno de Hadoop)
+### hadoop-env.sh (Entorno Interno de Hadoop)
 Asignamos la ruta de Java y forzamos a PDSH a utilizar el protocolo SSH.
 
-Bash
+```bash
 echo "export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64" >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
 echo "export PDSH_RCMD_TYPE=ssh" >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
-core-site.xml (Sistema de Archivos Central)
-XML
+```
+
+### core-site.xml (Sistema de Archivos Central)
+
+```xml
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/core-site.xml
 <configuration>
     <property>
@@ -78,10 +99,12 @@ cat << 'EOF' > /usr/local/hadoop/etc/hadoop/core-site.xml
     </property>
 </configuration>
 EOF
-hdfs-site.xml (Almacenamiento y Directorios)
+```
+
+### hdfs-site.xml (Almacenamiento y Directorios)
 Se define la replicación en "1" (al ser un solo nodo) y se establecen las rutas físicas donde se guardarán los datos de los bloques.
 
-XML
+```xml
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/hdfs-site.xml
 <configuration>
     <property>
@@ -98,8 +121,11 @@ cat << 'EOF' > /usr/local/hadoop/etc/hadoop/hdfs-site.xml
     </property>
 </configuration>
 EOF
-mapred-site.xml (Motor de MapReduce)
-XML
+```
+
+### mapred-site.xml (Motor de MapReduce)
+
+```xml
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/mapred-site.xml
 <configuration>
     <property>
@@ -120,10 +146,12 @@ cat << 'EOF' > /usr/local/hadoop/etc/hadoop/mapred-site.xml
     </property>
 </configuration>
 EOF
-yarn-site.xml (Gestor de Recursos YARN)
+```
+
+### yarn-site.xml (Gestor de Recursos YARN)
 Obligamos explícitamente al ResourceManager a publicarse en la IP del servidor.
 
-XML
+```xml
 cat << 'EOF' > /usr/local/hadoop/etc/hadoop/yarn-site.xml
 <configuration>
     <property>
@@ -140,32 +168,41 @@ cat << 'EOF' > /usr/local/hadoop/etc/hadoop/yarn-site.xml
     </property>
 </configuration>
 EOF
-workers (Nodos de Trabajo)
+```
+
+### workers (Nodos de Trabajo)
 Reemplazamos cualquier rastro de localhost para que el gestor localice los datanodes en la IP real.
 
-Bash
+```bash
 echo "[IP DEL SERVIDOR]" > /usr/local/hadoop/etc/hadoop/workers
-6. Parche de Compatibilidad: Java 17 y ResourceManager (YARN)
-Contexto del Problema: Al utilizar Java 17, las estrictas políticas de seguridad internas de la JVM bloquean por defecto la "reflexión profunda" (deep reflection). Esto provoca que el servicio ResourceManager de YARN falle al intentar levantar su interfaz web, mostrando el error: module java.base does not "opens java.lang" to unnamed module.
+```
 
-Solución: Otorgar permisos explícitos a la JVM de Hadoop para abrir estos módulos inyectando la bandera --add-opens.
+## 6. Parche de Compatibilidad: Java 17 y ResourceManager (YARN)
+
+**Contexto del Problema:** Al utilizar Java 17, las estrictas políticas de seguridad internas de la JVM bloquean por defecto la "reflexión profunda" (deep reflection). Esto provoca que el servicio ResourceManager de YARN falle al intentar levantar su interfaz web, mostrando el error: `module java.base does not "opens java.lang" to unnamed module`.
+
+**Solución:** Otorgar permisos explícitos a la JVM de Hadoop para abrir estos módulos inyectando la bandera `--add-opens`.
 
 Si YARN ya estaba en ejecución, lo detenemos primero:
-
-Bash
+```bash
 stop-yarn.sh
+```
+
 Inyectamos el permiso globalmente en el archivo de entorno principal de Hadoop:
-
-Bash
+```bash
 echo 'export HADOOP_OPTS="$HADOOP_OPTS --add-opens java.base/java.lang=ALL-UNNAMED"' >> /usr/local/hadoop/etc/hadoop/hadoop-env.sh
-Por precaución, replicamos el permiso en el archivo de entorno específico de YARN para asegurar que lo lea al aislar sus procesos:
+```
 
-Bash
+Por precaución, replicamos el permiso en el archivo de entorno específico de YARN para asegurar que lo lea al aislar sus procesos:
+```bash
 echo 'export YARN_OPTS="$YARN_OPTS --add-opens java.base/java.lang=ALL-UNNAMED"' >> /usr/local/hadoop/etc/hadoop/yarn-env.sh
-7. Formateo y Arranque del Clúster
+```
+
+## 7. Formateo y Arranque del Clúster
+
 Antes de usar HDFS por primera vez, se debe formatear el sistema de archivos del NameNode.
 
-Bash
+```bash
 # Formateo (Ejecutar solo la primera vez en un entorno limpio)
 hdfs namenode -format
 
@@ -174,27 +211,25 @@ start-dfs.sh
 
 # Arrancar el gestor de recursos y tareas (YARN)
 start-yarn.sh
-8. Verificación del Despliegue
+```
+
+## 8. Verificación del Despliegue
+
 Validamos que la máquina virtual de Java esté ejecutando los procesos principales del ecosistema y que el ResourceManager se mantenga estable:
 
-Bash
+```bash
 jps
-Salida esperada (con PIDs variados):
+```
 
-NameNode
-
-DataNode
-
-SecondaryNameNode
-
-ResourceManager
-
-NodeManager
-
-Jps
+**Salida esperada** (con PIDs variados):
+* NameNode
+* DataNode
+* SecondaryNameNode
+* ResourceManager
+* NodeManager
+* Jps
 
 Finalmente, las interfaces de monitoreo web estarán disponibles en el navegador:
-
-Administración HDFS: http://[IP DEL SERVIDOR]:9870
-
-Administración YARN: http://[IP DEL SERVIDOR]:8088
+* **Administración HDFS:** `http://[IP DEL SERVIDOR]:9870`
+* **Administración YARN:** `http://[IP DEL SERVIDOR]:8088`
+```

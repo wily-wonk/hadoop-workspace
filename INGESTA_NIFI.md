@@ -71,3 +71,59 @@ hdfs dfs -cat /datos_nifi/sensores/<nombre_del_archivo_generado>
 ```
 
 ***
+
+## 5. El Camino de Vuelta: Extracción y Traducción Inversa (Parquet a JSON)
+
+Para validar que los datos no se corrompieron y poder leer el formato binario de Parquet, se implementó un flujo inverso de extracción en el mismo lienzo de NiFi. Este pipeline recupera el archivo de HDFS y lo transforma de nuevo a texto plano para auditoría.
+
+![Flujo inverso en NiFi: Extracción y lectura]
+<img width="1135" height="606" alt="image" src="https://github.com/user-attachments/assets/c61b6cf5-da0f-4e6e-aa80-a87cc211e913" />
+
+
+### Arquitectura del Flujo Inverso:
+1. **`GetHDFS` (El Extractor):**
+   * Se conecta al puerto `9000` de Hadoop y recupera el archivo binario.
+   * **Propiedad Clave:** `Keep Source File = true`. Esto es vital para entornos de prueba, ya que evita que NiFi elimine el archivo original de HDFS tras leerlo.
+
+2. **`ConvertRecord` (El Traductor Inverso):**
+   * **Record Reader:** `ParquetReader` (Hereda automáticamente el esquema incrustado dentro del archivo Parquet, sin configuración manual).
+   * **Record Writer:** `JsonRecordSetWriter` (Reconstruye la estructura JSON original).
+
+3. **`LogAttribute` (El Visualizador):**
+   * Recibe el archivo ya convertido a JSON.
+   * Modificando la propiedad `Payload Value Characters` a `10000`, permite que el contenido del archivo se imprima directamente en la bitácora de procedencia de datos (Data Provenance) de NiFi para su lectura humana.
+
+---
+
+## 6. Alternativa CLI: Inspección Directa por Terminal
+
+En entornos de producción, encender un flujo de NiFi solo para leer un dato puede ser ineficiente. Como alternativa directa para los ingenieros de datos, se puede utilizar la librería de Python `parquet-tools` directamente en la terminal del servidor Ubuntu.
+
+Esta técnica es ideal para auditorías rápidas y depuración de datos crudos.
+
+**Paso 1: Instalación de la utilidad**
+```bash
+# Instalar el lector de Parquet usando el gestor de paquetes de Python
+pip install parquet-tools
+```
+
+**Paso 2: Extracción local**
+```bash
+# Traer una copia del archivo desde el clúster HDFS hacia el almacenamiento local (temporal) de Ubuntu
+hdfs dfs -get /datos_nifi/sensores/*.parquet /tmp/
+```
+
+**Paso 3: Lectura y Conversión por Consola**
+Una vez el archivo está en Linux, se puede inspeccionar su contenido interno.
+
+```bash
+# Leer el contenido directamente en la consola (formato tabla/texto)
+parquet-tools inspect /tmp/archivo.parquet
+
+# Convertir el binario Parquet a un archivo JSON real para revisión detallada
+parquet-tools show --json /tmp/archivo.parquet > /tmp/datos_auditoria.json
+
+# Leer el archivo JSON resultante
+cat /tmp/datos_auditoria.json
+```
+

@@ -89,11 +89,25 @@ Una vez que los eventos transaccionales residen en el clúster de Kafka en el se
 
 #### Configuración del Pipeline en NiFi:
 Para este ejercicio se ha diseñado un flujo de 4 etapas que garantiza que el dato sea persistido y optimizado:
+<img width="1362" height="783" alt="image" src="https://github.com/user-attachments/assets/3f6992c0-b8b2-4f34-b418-085f0f42a0e3" />
+
 
 1.  **`ConsumeKafka_2_6`**: Actúa como consumidor del tópico `srv_gamlp.public.empleados_gamlp`. Se configura el `Group ID` como `nifi-cdc-group` para permitir el rastreo de mensajes (offsets).
+<img width="985" height="632" alt="image" src="https://github.com/user-attachments/assets/b8c3e95e-a324-494f-bffa-f7c3492b9881" />
+
 2.  **`UpdateAttribute`**: Se inyecta el atributo `filename` con la expresión `${now():format('yyyyMMdd_HHmmssSSS')}.parquet` para evitar colisiones de nombres en el Data Lake.
-3.  **`ConvertRecord`**: Realiza la transformación de **JSON complejo (Debezium)** hacia **Parquet (Columnar)**. Se utiliza compresión `SNAPPY` para optimizar el almacenamiento en los bloques de HDFS.
-4.  **`PutHDFS`**: El procesador final que escribe los binarios en la infraestructura de Ubuntu.
+<img width="976" height="415" alt="image" src="https://github.com/user-attachments/assets/bf91c0bc-bce5-4ffe-bb7a-346cc7588f7d" />.
+
+ 3.    **`EvaluateJsonPath`**: Extrae y limpia los datos operacionales del envelope de Debezium
+El mensaje original de Kafka (proveniente de Debezium) contiene un envelope (sobre) con metadatos que no son necesarios para el almacenamiento final en el Data Lake. Este procesador extrae exclusivamente el bloque payload.after, que contiene los datos actualizados del registro después del cambio (INSERT/UPDATE). Se utiliza la expresión $.payload.after para acceder a la ruta exacta dentro del JSON, y se reemplaza el contenido del FlowFile con este objeto JSON limpio.
+<img width="978" height="425" alt="image" src="https://github.com/user-attachments/assets/c7363375-a28e-4c70-ac41-a741bef0ae67" />
+
+4.  **`ConvertRecord`**: Realiza la transformación de **JSON complejo (Debezium)** hacia **Parquet (Columnar)**. Se utiliza compresión `SNAPPY` para optimizar el almacenamiento en los bloques de HDFS.
+<img width="979" height="353" alt="image" src="https://github.com/user-attachments/assets/fdbbdea6-7ee9-45bd-ab57-4af0d502fbeb" />
+
+5.  **`PutHDFS`**: El procesador final que escribe los binarios en la infraestructura de Ubuntu.
+<img width="976" height="630" alt="image" src="https://github.com/user-attachments/assets/d645e712-628f-4e18-aba7-f285342eea31" />
+
 
 **Parámetros de conexión HDFS:**
 * **Hadoop Configuration Resources:** `C:\Users\ZBook\Documents\workspace\nifi\core-site.xml,C:\Users\ZBook\Documents\workspace\nifi\hdfs-site.xml`
@@ -107,9 +121,10 @@ Tras realizar un cambio en el PostgreSQL (Docker), se valida la creación autom�
 # Listar los archivos Parquet generados por el flujo de CDC
 hdfs dfs -ls -R /cdc/gamlp/empleados/
 
-# Inspeccionar el contenido de un archivo recién llegado
-parquet-tools show /tmp/ultimo_archivo.parquet
 ```
+<img width="896" height="88" alt="image" src="https://github.com/user-attachments/assets/27b03ea8-352c-48c5-ad89-13214ca17c8e" />
+
+
 
 ### 6. Conclusión de la Integración
 Con esta implementación, se ha logrado cerrar el ciclo de vida del dato:
@@ -117,6 +132,7 @@ Con esta implementación, se ha logrado cerrar el ciclo de vida del dato:
 * **Transporte:** Mensajería distribuida (Kafka).
 * **Procesamiento:** Transformación de formato al vuelo (NiFi).
 * **Persistencia:** Almacenamiento distribuido escalable (HDFS).
+* 
 
 
 ## 7. Prueba
@@ -160,11 +176,7 @@ hdfs dfs -ls /cdc/gamlp/empleados/
 # 2. Extraer el archivo más reciente hacia el sistema de archivos local de Ubuntu para su auditoría
 # (Sustituir el nombre del archivo con el generado por NiFi)
 hdfs dfs -get /cdc/gamlp/empleados/empleado_cdc_20260410_153022.parquet /tmp/
-
-# 3. Inspeccionar el contenido del formato binario columnar
 parquet-tools show /tmp/empleado_cdc_20260410_153022.parquet
 ```
+<img width="902" height="211" alt="image" src="https://github.com/user-attachments/assets/25a321f2-22e0-44e8-9907-c75025214a7f" />
 
-El resultado en consola mostrará un registro estructurado confirmando la creación o actualización del usuario "Ana", validando así el éxito del pipeline **CDC + Ingesta Streaming + Ecosistema Hadoop**.
-
-***

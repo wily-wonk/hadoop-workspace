@@ -1,5 +1,5 @@
 
-###Ingesta en Tiempo Real (CDC) hacia el Ecosistema Hadoop
+### Ingesta en Tiempo Real (CDC) hacia el Ecosistema Hadoop
 
 Como evolución a la ingesta por lotes, este ejercicio documenta la integración de **Apache Kafka** como motor de *streaming* para el ecosistema Hadoop. 
 

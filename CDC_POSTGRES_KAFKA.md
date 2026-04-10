@@ -1,35 +1,28 @@
+##Ingesta en Tiempo Real (CDC) hacia el Ecosistema Hadoop
 
-# Pipeline CDC (Change Data Capture): PostgreSQL local hacia Apache Kafka (Ubuntu)
+Como evolución a la ingesta por lotes, este ejercicio documenta la integración de **Apache Kafka** como motor de *streaming* para el ecosistema Hadoop. 
 
-Esta guía documenta la implementación de una arquitectura de captura de datos en tiempo real utilizando **Debezium** y **Kafka Connect**. 
+El objetivo de esta primera parte es capturar eventos en tiempo real (INSERT, UPDATE, DELETE) desde una base de datos transaccional utilizando **Debezium**, y dejarlos encolados en un tópico de Kafka en el servidor Ubuntu. En la siguiente etapa, estos eventos serán consumidos, transformados y almacenados definitivamente en HDFS.
 
-El objetivo del ejercicio es capturar cada evento (INSERT, UPDATE, DELETE) que ocurre en una base de datos transaccional de prueba (alojada en un contenedor Docker en Windows) y transmitirlo instantáneamente como un evento JSON hacia un clúster de Apache Kafka alojado en un servidor Ubuntu.
+**Arquitectura del Flujo (Parte 1):**
+`PostgreSQL (Local) -> Kafka Connect (Ubuntu) -> Kafka Broker (Ubuntu) -> [Destino final: HDFS]`
 
-**Arquitectura del Ejercicio:**
-* **Servidor Kafka (Destino):** Ubuntu Server (IP: `192.168.32.124`). Los servicios de Kafka Broker y Kafka Connect ya se encuentran aprovisionados y en ejecución.
-* **Servidor de Base de Datos (Origen):** Entorno local Windows utilizando Docker para aislar la base de datos de pruebas.
+### 1. Aprovisionamiento del Origen Transaccional (Docker)
+Para simular un entorno de producción sin afectar el sistema host, se levanta una instancia aislada de PostgreSQL en la máquina local (Windows).
 
----
-
-## 1. Aprovisionamiento de la Base de Datos de Prueba (Docker)
-
-Para no afectar entornos de producción, se levanta una instancia de PostgreSQL aislada mediante Docker Compose.
-
-**Ejecución del contenedor:**
 ```powershell
-# Levantar únicamente el servicio de PostgreSQL en segundo plano
+# Levantar únicamente el servicio de PostgreSQL del docker-compose
 docker-compose up -d postgres-debezium
 ```
 
-**Configuración de la Tabla y Nivel de Réplica:**
-Una vez que el contenedor está en ejecución, se ingresa a la base de datos para crear la estructura e inyectar un registro de prueba. Es fundamental establecer el nivel de réplica en `FULL` para que los logs transaccionales guarden el estado "antes" y "después" de cada cambio.
+Una vez en ejecución, se prepara la base de datos y se habilita la captura lógica de cambios (Logical Replication), un requisito estricto para que Debezium pueda extraer el estado "antes" y "después" de cada transacción.
 
 ```powershell
 docker exec -it postgres-debezium psql -U postgres -d gamlp
 ```
 
 ```sql
--- 1. Crear tabla de prueba
+-- Crear tabla para la simulación
 CREATE TABLE empleados_gamlp (
     id SERIAL PRIMARY KEY,
     nombre VARCHAR(100),
@@ -37,22 +30,17 @@ CREATE TABLE empleados_gamlp (
     salario DECIMAL(10,2)
 );
 
--- 2. Habilitar captura de cambios completa (Requisito estricto de Debezium)
+-- Habilitar captura de cambios completa en los logs (WAL)
 ALTER TABLE empleados_gamlp REPLICA IDENTITY FULL;
 
--- 3. Insertar dato base
+-- Insertar un dato inicial para el Snapshot
 INSERT INTO empleados_gamlp (nombre, cargo, salario) VALUES ('Wily', 'Ingeniero de Datos', 5000.00);
 
 \q
 ```
 
----
-
-## 2. Configuración del Conector Debezium (JSON)
-
-Para que Kafka Connect (en Ubuntu) sepa cómo extraer los datos de Windows, se define un archivo de configuración llamado `debezium-postgres.json`. 
-
-*Nota: Se utiliza la propiedad `topic.prefix` obligatoria para versiones de Debezium 2.x en adelante.*
+### 2. Configuración del Conector Debezium
+Kafka Connect se encuentra operando nativamente en el servidor Ubuntu. Se declara el siguiente *Contrato de Conexión* (`debezium-postgres.json`) para que el servidor remoto extraiga los datos del entorno local.
 
 ```json
 {
@@ -72,42 +60,114 @@ Para que Kafka Connect (en Ubuntu) sepa cómo extraer los datos de Windows, se d
 }
 ```
 
----
-
-## 3. Despliegue del Conector vía API REST
-
-Se utiliza PowerShell para inyectar la configuración directamente a la API REST del servicio Kafka Connect que está escuchando en el servidor Ubuntu.
+### 3. Inyección del Conector vía API REST
+Se utiliza la terminal local para enviar la configuración al motor de Kafka Connect en el clúster.
 
 ```powershell
-# Cargar el archivo JSON en memoria
+# Cargar la configuración
 $json = Get-Content .\debezium-postgres.json -Raw
 
-# Realizar la petición POST hacia el servidor remoto
+# Desplegar el conector en el servidor Ubuntu (Reemplazar con la IP del servidor)
 Invoke-RestMethod -Method Post -Uri "http://192.168.32.124:8083/connectors" -Header @{"Content-Type"="application/json"} -Body $json
 ```
 
-Si la petición es exitosa, la API responde confirmando la creación del conector `gamlp-postgres-connector`, y Debezium comienza a monitorear la base de datos automáticamente.
-
----
-
-## 4. Validación del Flujo en Tiempo Real
-
-Para auditar que los eventos cruzan la red correctamente, se inicia un consumidor de consola directamente en el servidor Ubuntu, apuntando al nuevo tópico generado por Debezium.
+### 4. Auditoría de la Ingesta en Kafka
+Para validar que los datos transaccionales han cruzado exitosamente hacia el ecosistema Big Data, se audita el tópico generado en el servidor Ubuntu.
 
 **En la terminal del servidor Ubuntu:**
 ```bash
-# Escuchar los eventos del tópico desde el principio
+# Iniciar un consumidor en consola apuntando al nuevo tópico
 bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic srv_gamlp.public.empleados_gamlp --from-beginning
 ```
 
-**Prueba de Fuego (Transacción CDC):**
-Si desde Windows se ejecuta una actualización en la base de datos:
-```sql
-UPDATE empleados_gamlp SET salario = 6000.00 WHERE nombre = 'Wily';
-```
-
-El consumidor en Ubuntu captura instantáneamente el evento, mostrando un payload JSON detallado que contiene tanto el estado anterior (`"before": {"salario": 5000.00}`) como el estado nuevo (`"after": {"salario": 6000.00}`), demostrando un flujo de streaming transaccional impecable.
 
 ***
 
-¡Pega esto en tu GitHub y tendrás otro componente clave para tu portafolio de ingeniería! ¿Quieres que hagamos la prueba del consumidor en tu Ubuntu para ver los JSON fluir en vivo?
+### 5. Parte B: Consumo de Streaming y Persistencia en HDFS
+Una vez que los eventos transaccionales residen en el clúster de Kafka en el servidor Ubuntu, se utiliza **Apache NiFi** (desde el host Windows) como motor de orquestación para mover esos datos hacia el almacenamiento definitivo en Hadoop.
+
+#### Configuración del Pipeline en NiFi:
+Para este ejercicio se ha diseñado un flujo de 4 etapas que garantiza que el dato sea persistido y optimizado:
+
+1.  **`ConsumeKafka_2_6`**: Actúa como consumidor del tópico `srv_gamlp.public.empleados_gamlp`. Se configura el `Group ID` como `nifi-cdc-group` para permitir el rastreo de mensajes (offsets).
+2.  **`UpdateAttribute`**: Se inyecta el atributo `filename` con la expresión `${now():format('yyyyMMdd_HHmmssSSS')}.parquet` para evitar colisiones de nombres en el Data Lake.
+3.  **`ConvertRecord`**: Realiza la transformación de **JSON complejo (Debezium)** hacia **Parquet (Columnar)**. Se utiliza compresión `SNAPPY` para optimizar el almacenamiento en los bloques de HDFS.
+4.  **`PutHDFS`**: El procesador final que escribe los binarios en la infraestructura de Ubuntu.
+
+**Parámetros de conexión HDFS:**
+* **Hadoop Configuration Resources:** `C:\Users\ZBook\Documents\workspace\nifi\core-site.xml,C:\Users\ZBook\Documents\workspace\nifi\hdfs-site.xml`
+* **Directory:** `/cdc/gamlp/empleados/`
+* **Conflict Resolution:** `replace`
+
+#### Verificación de Datos en Hadoop:
+Tras realizar un cambio en el PostgreSQL (Docker), se valida la creación automática de los archivos en el servidor de destino:
+
+```bash
+# Listar los archivos Parquet generados por el flujo de CDC
+hdfs dfs -ls -R /cdc/gamlp/empleados/
+
+# Inspeccionar el contenido de un archivo recién llegado
+parquet-tools show /tmp/ultimo_archivo.parquet
+```
+
+### 6. Conclusión de la Integración
+Con esta implementación, se ha logrado cerrar el ciclo de vida del dato:
+* **Captura:** Desde una BD transaccional (Postgres).
+* **Transporte:** Mensajería distribuida (Kafka).
+* **Procesamiento:** Transformación de formato al vuelo (NiFi).
+* **Persistencia:** Almacenamiento distribuido escalable (HDFS).
+
+
+## 7. Prueba
+
+Para comprobar que toda la arquitectura funciona en armonía, se simulará una transacción comercial en el origen (Windows) y se auditará su llegada, ya optimizada, a la bodega de datos (Ubuntu).
+
+### Paso 1: Generar el Evento en el Origen (Windows / Docker)
+Desde la terminal de PowerShell en Windows, se accede directamente a la línea de comandos del motor de base de datos dentro del contenedor Docker para inyectar un nuevo registro.
+
+```powershell
+# 1. Entrar a la terminal interactiva (psql) dentro del contenedor PostgreSQL
+docker exec -it postgres-debezium psql -U postgres -d gamlp
+```
+
+Una vez dentro de la consola de la base de datos (`gamlp=#`), se ejecuta una transacción:
+
+```sql
+-- 2. Insertar un nuevo empleado para disparar el evento CDC
+INSERT INTO empleados_gamlp (nombre, cargo, salario) VALUES ('Ana', 'Analista de Seguridad', 4500.00);
+
+-- (Opcional) Ejecutar una actualización para ver el Before/After en el payload
+UPDATE empleados_gamlp SET salario = 4800.00 WHERE nombre = 'Ana';
+
+-- 3. Salir del motor de base de datos
+\q
+```
+
+### Paso 2: Monitoreo en Tránsito (Apache NiFi)
+Al ejecutar el comando SQL, el evento viaja a través de Debezium hacia Kafka. Inmediatamente, en la interfaz web de NiFi:
+1. El procesador `ConsumeKafka_2_6` absorbe el evento JSON.
+2. Los contadores de la interfaz se actualizan, mostrando cómo el archivo cruza por la transformación a Parquet.
+3. El procesador `PutHDFS` registra una transacción exitosa (Relación: `success`).
+
+### Paso 3: Verificación de Integridad en el Destino (Ubuntu / HDFS)
+Finalmente, desde la terminal del servidor Ubuntu, se confirma que el archivo Parquet no solo fue persistido, sino que contiene exactamente la transacción generada a cientos de kilómetros lógicos de distancia.
+
+```bash
+# 1. Listar los archivos depositados en el directorio de Hadoop
+hdfs dfs -ls /cdc/gamlp/empleados/
+
+# 2. Extraer el archivo más reciente hacia el sistema de archivos local de Ubuntu para su auditoría
+# (Sustituir el nombre del archivo con el generado por NiFi)
+hdfs dfs -get /cdc/gamlp/empleados/empleado_cdc_20260410_153022.parquet /tmp/
+
+# 3. Inspeccionar el contenido del formato binario columnar
+parquet-tools show /tmp/empleado_cdc_20260410_153022.parquet
+```
+
+El resultado en consola mostrará un registro estructurado confirmando la creación o actualización del usuario "Ana", validando así el éxito del pipeline **CDC + Ingesta Streaming + Ecosistema Hadoop**.
+
+***
+
+¡Y con eso cerramos el ciclo, Wily! Has documentado desde la configuración de red más básica hasta un pipeline de *Change Data Capture* en tiempo real con transformación columnar. 
+
+Abre tu terminal, haz ese `INSERT` de "Ana" y ve cómo suben los numeritos en tu NiFi. ¡Es la parte más satisfactoria del trabajo! ¿Listo para sumergirte en el mundo del procesamiento o quieres revisar algo de los logs que te arroje tu prueba?

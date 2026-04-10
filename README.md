@@ -234,4 +234,101 @@ jps
 Finalmente, las interfaces de monitoreo web estarán disponibles en el navegador:
 * **Administración HDFS:** `http://192.168.1.206:9870`
 * **Administración YARN:** `http://192.168.1.206:8088`
+
+
+## Automatización con Systemd (Arranque Automático)
+
+Para convertir Hadoop en un servicio nativo de Ubuntu que sobreviva a reinicios y se recupere de fallos, configuraremos dos servicios independientes en `systemd`. Esto evita que los procesos sean interrumpidos por el sistema operativo y garantiza un arranque secuencial limpio.
+
+> **Nota:** Antes de iniciar esta configuración, asegúrate de que no haya ningún proceso de Hadoop corriendo en segundo plano ejecutando manualmente `stop-yarn.sh` y `stop-dfs.sh`.
+
+### 1. Servicio para HDFS (Sistema de Archivos)
+Creamos el archivo de control maestro para HDFS:
+
+```bash
+sudo nano /etc/systemd/system/hadoop-dfs.service
 ```
+
+Pegamos la siguiente configuración. Es vital incluir `RemainAfterExit=yes` para evitar que Ubuntu asesine los subprocesos distribuidos (NameNode, DataNode) al terminar el script de arranque, y la variable `PDSH_RCMD_TYPE` para forzar la comunicación segura por SSH:
+
+```ini
+[Unit]
+Description=Hadoop Distributed File System (HDFS)
+After=network.target
+
+[Service]
+Type=forking
+RemainAfterExit=yes
+User=server
+Environment="HADOOP_HOME=/usr/local/hadoop"
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
+Environment="PDSH_RCMD_TYPE=ssh"
+ExecStart=/usr/local/hadoop/sbin/start-dfs.sh
+ExecStop=/usr/local/hadoop/sbin/stop-dfs.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 2. Servicio para YARN (Gestor de Recursos)
+Creamos el archivo de control para YARN:
+
+```bash
+sudo nano /etc/systemd/system/hadoop-yarn.service
+```
+
+Pegamos la configuración, indicándole en la sección `[Unit]` que solo debe arrancar después de que HDFS ya esté operativo:
+
+```ini
+[Unit]
+Description=Hadoop YARN Resource Manager
+After=hadoop-dfs.service
+
+[Service]
+Type=forking
+RemainAfterExit=yes
+User=server
+Environment="HADOOP_HOME=/usr/local/hadoop"
+Environment="JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64"
+Environment="PDSH_RCMD_TYPE=ssh"
+ExecStart=/usr/local/hadoop/sbin/start-yarn.sh
+ExecStop=/usr/local/hadoop/sbin/stop-yarn.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+### 3. Habilitar y Arrancar los Servicios
+Le indicamos al núcleo de Ubuntu que lea nuestras nuevas configuraciones y las habilite para arrancar automáticamente junto con el sistema operativo:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable hadoop-dfs.service
+sudo systemctl enable hadoop-yarn.service
+```
+
+Iniciamos el ecosistema completo a través de `systemd`:
+
+```bash
+sudo systemctl start hadoop-dfs.service
+sudo systemctl start hadoop-yarn.service
+```
+
+### 4. Verificación del Estado
+Comprobamos que Ubuntu haya adoptado los procesos correctamente:
+
+```bash
+systemctl status hadoop-dfs.service
+systemctl status hadoop-yarn.service
+```
+
+> **Nota esperada:** HDFS mostrará el estado `active (exited)` al ser un lanzador de subprocesos, mientras que YARN mostrará `active (running)`. Ambos estados son correctos.
+
+Finalmente, validamos la salud del clúster listando los procesos de Java activos en la memoria:
+
+```bash
+jps
+```
+

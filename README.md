@@ -1,4 +1,4 @@
-# Proyecto Hadoop: Instalación, Configuración y Prácticas
+# Hadoop: Instalación, Configuración y Prácticas
 
 Este repositorio contiene la guía de despliegue y los ejercicios prácticos desarrollados sobre el ecosistema de Apache Hadoop.
 

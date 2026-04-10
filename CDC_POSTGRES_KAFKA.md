@@ -167,7 +167,3 @@ parquet-tools show /tmp/empleado_cdc_20260410_153022.parquet
 El resultado en consola mostrará un registro estructurado confirmando la creación o actualización del usuario "Ana", validando así el éxito del pipeline **CDC + Ingesta Streaming + Ecosistema Hadoop**.
 
 ***
-
-¡Y con eso cerramos el ciclo, Wily! Has documentado desde la configuración de red más básica hasta un pipeline de *Change Data Capture* en tiempo real con transformación columnar. 
-
-Abre tu terminal, haz ese `INSERT` de "Ana" y ve cómo suben los numeritos en tu NiFi. ¡Es la parte más satisfactoria del trabajo! ¿Listo para sumergirte en el mundo del procesamiento o quieres revisar algo de los logs que te arroje tu prueba?

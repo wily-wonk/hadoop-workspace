@@ -1,4 +1,4 @@
-```markdown
+
 # Prácticas y Ejercicios Hadoop
 
 Este documento contiene una serie de ejercicios progresivos para dominar el uso de HDFS y MapReduce en el clúster.

@@ -232,8 +232,11 @@ jps
 * Jps
 
 Finalmente, las interfaces de monitoreo web estarán disponibles en el navegador:
-* **Administración HDFS:** `http://192.168.1.206:9870`
-* **Administración YARN:** `http://192.168.1.206:8088`
+* **Administración HDFS:** `http://[IP SERVIDOR]:9870`
+<img width="1016" height="829" alt="image" src="https://github.com/user-attachments/assets/37bb37b7-c045-4fe4-b93e-51b5737a17a3" />
+
+* **Administración YARN:** `http://[IP SERVIDOR]:8088`
+<img width="1882" height="500" alt="image" src="https://github.com/user-attachments/assets/def0fa2d-2b07-4a8e-8343-be588aba40ab" />
 
 
 ## Automatización con Systemd (Arranque Automático)

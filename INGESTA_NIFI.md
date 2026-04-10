@@ -29,7 +29,8 @@ Para que Apache NiFi (ejecutándose en Windows) pueda localizar y comunicarse co
 El pipeline consta de tres etapas principales: simulación de datos crudos, serialización a formato columnar y escritura en el clúster.
 
 ![Vista general del pipeline de datos en NiFi]
-<img width="1220" height="327" alt="image" src="[https://github.com/user-attachments/assets/cdd3c59a-6396-42c6-be7b-a944175e50f2](https://github.com/user-attachments/assets/cdd3c59a-6396-42c6-be7b-a944175e50f2)" />
+<img width="1075" height="553" alt="image" src="https://github.com/user-attachments/assets/04e65202-5507-403a-ae83-d74969ae3a8f" />
+
 
 ### Etapa A: Generación de Datos Crudos (`GenerateFlowFile`)
 Se simula el comportamiento de un sensor enviando telemetría en formato JSON.
@@ -43,12 +44,14 @@ Para maximizar el rendimiento de lectura y minimizar el espacio en disco, los da
 
 1. **Lector de Datos (`JsonTreeReader`):**
    * **Schema Access Strategy:** `Infer Schema` (Deduce dinámicamente la estructura del texto entrante).
-   *(Agrega aquí tu captura del JsonTreeReader)*
+   <img width="985" height="683" alt="image" src="https://github.com/user-attachments/assets/f7248c3b-b19b-41e4-8418-2391d2581ec7" />
+
 
 2. **Escritor de Datos (`ParquetRecordSetWriter`):**
    * **Schema Access Strategy:** `Inherit Record Schema` (Adopta la estructura deducida por el lector).
    * **Compression Type:** `SNAPPY` (Algoritmo estándar para compresión rápida en ecosistemas Big Data).
-   *(Agrega aquí tu captura del ParquetRecordSetWriter)*
+   <img width="1000" height="698" alt="image" src="https://github.com/user-attachments/assets/5579fef2-d93a-4a78-a767-c76d5feda0b7" />
+
 
 ### Etapa C: Escritura Distribuida (`PutHDFS`)
 Este procesador establece la conexión RPC nativa por el puerto `9000` de HDFS para depositar los archivos Parquet resultantes.
@@ -62,13 +65,15 @@ Este procesador establece la conexión RPC nativa por el puerto `9000` de HDFS p
 Para mantener el flujo limpio, se marcan las relaciones `success` y `failure` en *Auto-terminate relationships*, instruyendo al sistema a destruir el FlowFile local una vez que la transacción con HDFS concluya.
 
 ![Configuración de Propiedades del procesador PutHDFS]
-<img width="992" height="689" alt="image" src="[https://github.com/user-attachments/assets/d04625ea-debe-47db-9e81-2ee1bac22bc2](https://github.com/user-attachments/assets/d04625ea-debe-47db-9e81-2ee1bac22bc2)" />
+<img width="996" height="688" alt="image" src="https://github.com/user-attachments/assets/5b195aa8-fc44-4bfd-8001-8f2183fc434e" />
+
 
 ## 4. Validación de la Ingesta Visual
 Al iniciar el flujo, los datos cruzan la red y son almacenados en bloques dentro del NameNode. La llegada de los archivos se verifica directamente a través de la interfaz web de monitoreo de HDFS.
 
 ![Archivos Parquet depositados exitosamente en HDFS]
-<img width="1293" height="888" alt="image" src="[https://github.com/user-attachments/assets/c6efb98e-c75f-4295-9c31-52c94d8fa702](https://github.com/user-attachments/assets/c6efb98e-c75f-4295-9c31-52c94d8fa702)" />
+<img width="1279" height="602" alt="image" src="https://github.com/user-attachments/assets/183ceacb-41a9-4bf6-b642-4d652f5548bf" />
+
 
 ---
 
